@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
 import { logger } from '@utils/logger';
 import { serverClient } from '@utils/serverClient';
-import { CHATBOT_ID } from '@config';
+import { CHATBOT_AI_URI, CHATBOT_ID } from '@config';
 import { randomUUID } from 'crypto';
+import axios from 'axios';
 
 class IndexController {
   // Frontend에서 userToken을 얻기 위한 API
@@ -28,53 +29,53 @@ class IndexController {
       const text = req.body.message.text;
       const userId = req.body.user.id;
       const memberIds = req.body.members.map(m => m.user_id);
+      const channel = serverClient.channel(channelType, channelId);
 
+      // 챗봇 때문에 생기는 hook 제외
       if (userId === CHATBOT_ID || !memberIds.includes(CHATBOT_ID)) {
         res.sendStatus(200);
         return;
       }
 
       // AI 모델 요청
-
-      // DB 조회
-
-      const resultText = `AI processed message of '${text}'`;
+      const aiResponse = await axios.post(`${CHATBOT_AI_URI}/intent`, {
+        channelId: channelId,
+        contents: text,
+      });
 
       // 챗봇 응답
-      const channel = serverClient.channel(channelType, channelId);
-      await channel.sendMessage({
-        text: resultText,
-        user_id: CHATBOT_ID,
-        // attachments: [
-        //   {
-        //     type: 'form',
-        //     title: 'Select your account',
-        //     actions: [
-        //       {
-        //         name: 'account',
-        //         text: 'Checking',
-        //         style: 'primary',
-        //         type: 'button',
-        //         value: 'checking',
-        //       },
-        //       {
-        //         name: 'account',
-        //         text: 'Saving',
-        //         style: 'default',
-        //         type: 'button',
-        //         value: 'saving',
-        //       },
-        //       {
-        //         name: 'account',
-        //         text: 'Cancel',
-        //         style: 'default',
-        //         type: 'button',
-        //         value: 'cancel',
-        //       },
-        //     ],
-        //   },
-        // ],
-      });
+      for (const { isLawyer, keyword, answer } of aiResponse.data.content) {
+        if (isLawyer) {
+          const { users } = await serverClient.queryUsers({
+            teams: { $contains: 'lawyer' },
+          });
+          const filteredLawyers = users.filter(user => user.keyword && keyword === user.keword);
+
+          await channel.sendMessage({
+            text: answer,
+            user_id: CHATBOT_ID,
+            attachments: [
+              {
+                type: 'form',
+                title: '변호사 추천',
+                actions: filteredLawyers.map(lawyer => {
+                  return {
+                    type: 'lawyer',
+                    value: lawyer.id,
+                  };
+                }),
+              },
+            ],
+          });
+        } else {
+          await channel.sendMessage({
+            text: answer,
+            user_id: CHATBOT_ID,
+          });
+        }
+      }
+
+      // TODO: 유저 입력 막기
 
       res.sendStatus(200);
     } catch (error) {
@@ -184,7 +185,7 @@ class IndexController {
         id: `lawyer-${randomUUID()}`,
         name: name,
         role: 'user',
-        isLawyer: true,
+        teams: ['lawyer'],
         keyword: keyword,
       });
 
