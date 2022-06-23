@@ -45,6 +45,35 @@ class IndexController {
       await channel.sendMessage({
         text: resultText,
         user_id: CHATBOT_ID,
+        // attachments: [
+        //   {
+        //     type: 'form',
+        //     title: 'Select your account',
+        //     actions: [
+        //       {
+        //         name: 'account',
+        //         text: 'Checking',
+        //         style: 'primary',
+        //         type: 'button',
+        //         value: 'checking',
+        //       },
+        //       {
+        //         name: 'account',
+        //         text: 'Saving',
+        //         style: 'default',
+        //         type: 'button',
+        //         value: 'saving',
+        //       },
+        //       {
+        //         name: 'account',
+        //         text: 'Cancel',
+        //         style: 'default',
+        //         type: 'button',
+        //         value: 'cancel',
+        //       },
+        //     ],
+        //   },
+        // ],
       });
 
       res.sendStatus(200);
