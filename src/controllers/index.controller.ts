@@ -82,6 +82,11 @@ class IndexController {
     }
   };
 
+  // TODO: AI 모델 처리 완료 hook API
+  public aiCompleteHook = async (req: Request, res: Response, next: NextFunction) => {
+    return;
+  };
+
   // 대화 상대 변호사로 변경 및 새로운 챗봇 방 생성 API
   public addLawyerAndReleaseBot = async (req: Request, res: Response, next: NextFunction) => {
     const { userId, lawyerId } = req.body;
@@ -165,6 +170,25 @@ class IndexController {
       await channel.delete({ hard_delete: true });
 
       res.sendStatus(200);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // 변호사 추가하는 API
+  public addLawyer = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { name, keyword } = req.body;
+
+      const response = await serverClient.upsertUser({
+        id: `lawyer-${randomUUID()}`,
+        name: name,
+        role: 'user',
+        isLawyer: true,
+        keyword: keyword,
+      });
+
+      res.send(response);
     } catch (error) {
       next(error);
     }
