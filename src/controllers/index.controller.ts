@@ -32,7 +32,7 @@ class IndexController {
       const channel = serverClient.channel(channelType, channelId);
 
       // 챗봇 때문에 생기는 hook 제외
-      if (userId === CHATBOT_ID || !memberIds.includes(CHATBOT_ID)) {
+      if (userId === CHATBOT_ID || !memberIds.includes(CHATBOT_ID) || !text) {
         res.sendStatus(200);
         return;
       }
@@ -42,6 +42,11 @@ class IndexController {
         channelId: channelId,
         contents: text,
       });
+
+      if (aiResponse.status != 200) {
+        res.sendStatus(500);
+        return;
+      }
 
       // 챗봇 응답
       for (const { isLawyer, keyword, answer } of aiResponse.data.content) {
