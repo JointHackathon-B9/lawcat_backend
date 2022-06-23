@@ -14,6 +14,9 @@ class IndexRoute implements Routes {
   private initializeRoutes() {
     this.router.post(`${this.path}signIn`, this.indexController.signIn);
     this.router.post(`${this.path}hook`, this.indexController.hook);
+    this.router.post(`${this.path}bot`, this.indexController.createBotChannel);
+    this.router.post(`${this.path}lawyer`, this.indexController.addLawyerAndReleaseBot);
+    this.router.delete(`${this.path}channel/:id`, this.indexController.deleteChannel);
   }
 }
 

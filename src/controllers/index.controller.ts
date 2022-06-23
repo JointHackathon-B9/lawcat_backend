@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { logger } from '@utils/logger';
 import { serverClient } from '@utils/serverClient';
 import { CHATBOT_ID } from '@config';
+import { randomUUID } from 'crypto';
 
 class IndexController {
   // Frontend에서 userToken을 얻기 위한 API
@@ -52,24 +53,89 @@ class IndexController {
     }
   };
 
-  // TODO: 챗봇 채널을 생성하는 API
-  public createBotChannel = async (req: Request, res: Response, next: NextFunction) => {
-    const botChannelName = '법률 상담 챗봇 - 로캣';
-    const userId = req.body.userId;
+  // 대화 상대 변호사로 변경 및 새로운 챗봇 방 생성 API
+  public addLawyerAndReleaseBot = async (req: Request, res: Response, next: NextFunction) => {
+    const { userId, lawyerId } = req.body;
 
     try {
-      const channel = serverClient.channel('counsel', `${CHATBOT_ID}-${userId}`, {
+      // 챗봇 채널 있는지 확인
+      const channels = await serverClient.queryChannels({ type: 'counsel', members: { $eq: [userId, CHATBOT_ID] } });
+      console.log(channels.length);
+      if (channels.length != 1) {
+        res.sendStatus(400);
+        return;
+      }
+
+      // 변호사 조회
+      const { users } = await serverClient.queryUsers({ id: { $in: [lawyerId] } });
+      const lawyer = users[0];
+      const lawyerName = lawyer.name || lawyer.last_name + lawyer.first_name;
+
+      const channel = channels[0];
+
+      // 채널에서 봇 추방
+      await channel.removeMembers([CHATBOT_ID]);
+
+      // 선택한 변호사 유저 추가
+      await channel.addMembers([lawyerId]);
+      await channel.updatePartial({ set: { name: `${lawyerName} 변호사님과의 상담` } });
+
+      // 새로운 봇 채널 생성
+      const botChannelName = '법률 상담 챗봇 - 로캣';
+      const newChannel = serverClient.channel('counsel', `${userId}-` + randomUUID(), {
         name: botChannelName,
+        members: [CHATBOT_ID, userId],
+        created_by_id: CHATBOT_ID,
       });
-      await channel.create();
+      await newChannel.create();
+
+      await channel.sendMessage({
+        text: `${lawyerName} 변호사님과 연결 되었습니다.`,
+        user_id: lawyerId,
+      });
+
+      res.sendStatus(200);
     } catch (error) {
       next(error);
     }
   };
 
-  // TODO: 채널 삭제하는 API
-  public delteChannel = async (req: Request, res: Response, next: NextFunction) => {
+  // 챗봇 채널을 생성하는 API
+  public createBotChannel = async (req: Request, res: Response, next: NextFunction) => {
+    const botChannelName = '법률 상담 챗봇 - 로캣';
+    const { userId } = req.body;
+
     try {
+      // 챗봇 채널 있는지 확인
+      const channels = await serverClient.queryChannels({ type: 'counsel', members: { $in: [userId, CHATBOT_ID] } });
+      if (channels.length > 0) {
+        res.sendStatus(409);
+        return;
+      }
+
+      // 없다면 새로 생성
+      const channel = serverClient.channel('counsel', `${userId}-` + randomUUID(), {
+        name: botChannelName,
+        members: [CHATBOT_ID, userId],
+        created_by_id: CHATBOT_ID,
+      });
+      await channel.create();
+
+      res.sendStatus(200);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // 채널 삭제하는 API
+  public deleteChannel = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const channelId = req.params.id;
+
+      const channel = serverClient.channel('counsel', channelId);
+      await channel.delete({ hard_delete: true });
+
+      res.sendStatus(200);
     } catch (error) {
       next(error);
     }
